@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/ian-kent/Go-MailHog/MailHog-Server/monkey"
+	"github.com/mailhog/MailHog-Server/monkey"
 	"github.com/ian-kent/Go-MailHog/data"
 	"github.com/ian-kent/Go-MailHog/storage"
 	"github.com/ian-kent/envconf"
