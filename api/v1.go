@@ -5,11 +5,11 @@ import (
 	"net/smtp"
 	"strconv"
 
-	"github.com/mailhog/data"
 	"github.com/ian-kent/go-log/log"
 	gotcha "github.com/ian-kent/gotcha/app"
 	"github.com/ian-kent/gotcha/http"
 	"github.com/mailhog/MailHog-Server/config"
+	"github.com/mailhog/data"
 	"github.com/mailhog/storage"
 
 	"github.com/ian-kent/goose"
@@ -72,11 +72,19 @@ func (apiv1 *APIv1) broadcast(json string) {
 func (apiv1 *APIv1) eventstream(session *http.Session) {
 	log.Println("[APIv1] GET /api/v1/events")
 
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.GetWriter().Header().Set("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
+
 	stream.AddReceiver(session.Response.GetWriter())
 }
 
 func (apiv1 *APIv1) messages(session *http.Session) {
 	log.Println("[APIv1] GET /api/v1/messages")
+
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
 
 	// TODO start, limit
 	switch apiv1.config.Storage.(type) {
@@ -99,6 +107,10 @@ func (apiv1 *APIv1) message(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
 
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
+
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		message, _ := apiv1.config.Storage.(*storage.MongoDB).Load(id)
@@ -118,6 +130,10 @@ func (apiv1 *APIv1) message(session *http.Session) {
 func (apiv1 *APIv1) download(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
+
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
 
 	session.Response.Headers.Add("Content-Type", "message/rfc822")
 	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+".eml\"")
@@ -150,6 +166,9 @@ func (apiv1 *APIv1) download_part(session *http.Session) {
 	log.Printf("[APIv1] GET /api/v1/messages/%s/mime/part/%d/download\n", id, part)
 
 	// TODO extension from content-type?
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
 
 	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+strconv.Itoa(part)+"\"")
 
@@ -178,6 +197,10 @@ func (apiv1 *APIv1) download_part(session *http.Session) {
 func (apiv1 *APIv1) delete_all(session *http.Session) {
 	log.Println("[APIv1] POST /api/v1/messages")
 
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
+
 	session.Response.Headers.Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
@@ -193,6 +216,10 @@ func (apiv1 *APIv1) delete_all(session *http.Session) {
 func (apiv1 *APIv1) release_one(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] POST /api/v1/messages/%s/release\n", id)
+
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
 
 	session.Response.Headers.Add("Content-Type", "text/json")
 	var msg = &data.Message{}
@@ -239,6 +266,10 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 func (apiv1 *APIv1) delete_one(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] POST /api/v1/messages/%s/delete\n", id)
+
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+	}
 
 	session.Response.Headers.Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {

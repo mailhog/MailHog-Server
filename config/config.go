@@ -4,9 +4,9 @@ import (
 	"flag"
 	"log"
 
-	"github.com/mailhog/data"
 	"github.com/ian-kent/envconf"
 	"github.com/mailhog/MailHog-Server/monkey"
+	"github.com/mailhog/data"
 	"github.com/mailhog/storage"
 )
 
@@ -19,6 +19,7 @@ func DefaultConfig() *Config {
 		MongoDb:      "mailhog",
 		MongoColl:    "messages",
 		StorageType:  "memory",
+		CORSOrigin:   "",
 		MessageChan:  make(chan *data.Message),
 	}
 }
@@ -31,6 +32,7 @@ type Config struct {
 	MongoDb      string
 	MongoColl    string
 	StorageType  string
+	CORSOrigin   string
 	InviteJim    bool
 	Storage      storage.Storage
 	MessageChan  chan *data.Message
@@ -78,6 +80,7 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MongoUri, "mongouri", envconf.FromEnvP("MH_MONGO_URI", "127.0.0.1:27017").(string), "MongoDB URI, e.g. 127.0.0.1:27017")
 	flag.StringVar(&cfg.MongoDb, "mongodb", envconf.FromEnvP("MH_MONGO_DB", "mailhog").(string), "MongoDB database, e.g. mailhog")
 	flag.StringVar(&cfg.MongoColl, "mongocoll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
+	flag.StringVar(&cfg.CORSOrigin, "cors-origin", envconf.FromEnvP("MH_CORS_ORIGIN", "").(string), "CORS Access-Control-Allow-Origin header for API endpoints")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
 	jim.RegisterFlags()
 }
