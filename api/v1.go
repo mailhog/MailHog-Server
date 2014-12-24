@@ -5,12 +5,12 @@ import (
 	"net/smtp"
 	"strconv"
 
-	"github.com/mailhog/MailHog-Server/config"
 	"github.com/ian-kent/Go-MailHog/data"
-	"github.com/ian-kent/Go-MailHog/storage"
 	"github.com/ian-kent/go-log/log"
 	gotcha "github.com/ian-kent/gotcha/app"
 	"github.com/ian-kent/gotcha/http"
+	"github.com/mailhog/MailHog-Server/config"
+	"github.com/mailhog/storage"
 
 	"github.com/ian-kent/goose"
 )
