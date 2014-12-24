@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/ian-kent/Go-MailHog/data"
+	"github.com/mailhog/data"
 	"github.com/ian-kent/linkio"
 	"github.com/mailhog/MailHog-Server/monkey"
 	"github.com/mailhog/smtp"
