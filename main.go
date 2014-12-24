@@ -29,7 +29,7 @@ func main() {
 	cb := func(app *gotcha.App) {
 		api.CreateAPIv1(conf, app)
 	}
-	go http.Listen(conf.HTTPBindAddr, assets.Asset, exitCh, cb)
+	go http.Listen(conf.APIBindAddr, assets.Asset, exitCh, cb)
 	go smtp.Listen(conf, exitCh)
 
 	for {

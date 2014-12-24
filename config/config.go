@@ -13,7 +13,7 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		SMTPBindAddr: "0.0.0.0:1025",
-		HTTPBindAddr: "0.0.0.0:8025",
+		APIBindAddr:  "0.0.0.0:8025",
 		Hostname:     "mailhog.example",
 		MongoUri:     "127.0.0.1:27017",
 		MongoDb:      "mailhog",
@@ -26,7 +26,7 @@ func DefaultConfig() *Config {
 
 type Config struct {
 	SMTPBindAddr string
-	HTTPBindAddr string
+	APIBindAddr  string
 	Hostname     string
 	MongoUri     string
 	MongoDb      string
@@ -73,13 +73,13 @@ func Configure() *Config {
 }
 
 func RegisterFlags() {
-	flag.StringVar(&cfg.SMTPBindAddr, "smtpbindaddr", envconf.FromEnvP("MH_SMTP_BIND_ADDR", "0.0.0.0:1025").(string), "SMTP bind interface and port, e.g. 0.0.0.0:1025 or just :1025")
-	flag.StringVar(&cfg.HTTPBindAddr, "httpbindaddr", envconf.FromEnvP("MH_HTTP_BIND_ADDR", "0.0.0.0:8025").(string), "HTTP bind interface and port, e.g. 0.0.0.0:8025 or just :8025")
+	flag.StringVar(&cfg.SMTPBindAddr, "smtp-bind-addr", envconf.FromEnvP("MH_SMTP_BIND_ADDR", "0.0.0.0:1025").(string), "SMTP bind interface and port, e.g. 0.0.0.0:1025 or just :1025")
+	flag.StringVar(&cfg.APIBindAddr, "api-bind-addr", envconf.FromEnvP("MH_API_BIND_ADDR", "0.0.0.0:8025").(string), "HTTP bind interface and port for API, e.g. 0.0.0.0:8025 or just :8025")
 	flag.StringVar(&cfg.Hostname, "hostname", envconf.FromEnvP("MH_HOSTNAME", "mailhog.example").(string), "Hostname for EHLO/HELO response, e.g. mailhog.example")
 	flag.StringVar(&cfg.StorageType, "storage", envconf.FromEnvP("MH_STORAGE", "memory").(string), "Message storage: memory (default) or mongodb")
-	flag.StringVar(&cfg.MongoUri, "mongouri", envconf.FromEnvP("MH_MONGO_URI", "127.0.0.1:27017").(string), "MongoDB URI, e.g. 127.0.0.1:27017")
-	flag.StringVar(&cfg.MongoDb, "mongodb", envconf.FromEnvP("MH_MONGO_DB", "mailhog").(string), "MongoDB database, e.g. mailhog")
-	flag.StringVar(&cfg.MongoColl, "mongocoll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
+	flag.StringVar(&cfg.MongoUri, "mongo-uri", envconf.FromEnvP("MH_MONGO_URI", "127.0.0.1:27017").(string), "MongoDB URI, e.g. 127.0.0.1:27017")
+	flag.StringVar(&cfg.MongoDb, "mongo-db", envconf.FromEnvP("MH_MONGO_DB", "mailhog").(string), "MongoDB database, e.g. mailhog")
+	flag.StringVar(&cfg.MongoColl, "mongo-coll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
 	flag.StringVar(&cfg.CORSOrigin, "cors-origin", envconf.FromEnvP("MH_CORS_ORIGIN", "").(string), "CORS Access-Control-Allow-Origin header for API endpoints")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
 	jim.RegisterFlags()
