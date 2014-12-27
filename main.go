@@ -28,6 +28,7 @@ func main() {
 	exitCh = make(chan int)
 	cb := func(app *gotcha.App) {
 		api.CreateAPIv1(conf, app)
+		api.CreateAPIv2(conf, app)
 	}
 	go http.Listen(conf.APIBindAddr, assets.Asset, exitCh, cb)
 	go smtp.Listen(conf, exitCh)

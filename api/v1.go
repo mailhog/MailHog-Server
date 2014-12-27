@@ -15,6 +15,12 @@ import (
 	"github.com/ian-kent/goose"
 )
 
+// APIv1 implements version 1 of the MailHog API
+//
+// The specification has been frozen and will eventually be deprecated.
+// Only bug fixes and non-breaking changes will be applied here.
+//
+// Any changes/additions should be added in APIv2.
 type APIv1 struct {
 	config *config.Config
 	app    *gotcha.App
@@ -40,12 +46,23 @@ func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
 
 	r.Get("/api/v1/messages/?", apiv1.messages)
 	r.Delete("/api/v1/messages/?", apiv1.delete_all)
+	r.Options("/api/v1/messages/?", apiv1.defaultOptions)
+
 	r.Get("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.message)
 	r.Delete("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.delete_one)
+	r.Options("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.defaultOptions)
+
 	r.Get("/api/v1/messages/(?P<id>[^/]+)/download/?", apiv1.download)
-	r.Get("/api/v1/messages/(?P<id>[^/]+)/mime/part/(\\d+)/download/?", apiv1.download_part)
+	r.Options("/api/v1/messages/(?P<id>[^/]+)/download/?", apiv1.defaultOptions)
+
+	r.Get("/api/v1/messages/(?P<id>[^/]+)/mime/part/(?P<part>\\d+)/download/?", apiv1.download_part)
+	r.Options("/api/v1/messages/(?P<id>[^/]+)/mime/part/(?P<part>\\d+)/download/?", apiv1.defaultOptions)
+
 	r.Post("/api/v1/messages/(?P<id>[^/]+)/release/?", apiv1.release_one)
+	r.Options("/api/v1/messages/(?P<id>[^/]+)/release/?", apiv1.defaultOptions)
+
 	r.Get("/api/v1/events/?", apiv1.eventstream)
+	r.Options("/api/v1/events/?", apiv1.defaultOptions)
 
 	go func() {
 		for {
@@ -63,6 +80,14 @@ func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
 	return apiv1
 }
 
+func (apiv1 *APIv1) defaultOptions(session *http.Session) {
+	if len(apiv1.config.CORSOrigin) > 0 {
+		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+		session.Response.Headers.Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
+		session.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
+	}
+}
+
 func (apiv1 *APIv1) broadcast(json string) {
 	log.Println("[APIv1] BROADCAST /api/v1/events")
 	b := []byte(json)
@@ -72,8 +97,10 @@ func (apiv1 *APIv1) broadcast(json string) {
 func (apiv1 *APIv1) eventstream(session *http.Session) {
 	log.Println("[APIv1] GET /api/v1/events")
 
+	//apiv1.defaultOptions(session)
 	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.GetWriter().Header().Set("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+		session.Response.GetWriter().Header().Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+		session.Response.GetWriter().Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
 	}
 
 	stream.AddReceiver(session.Response.GetWriter())
@@ -82,9 +109,7 @@ func (apiv1 *APIv1) eventstream(session *http.Session) {
 func (apiv1 *APIv1) messages(session *http.Session) {
 	log.Println("[APIv1] GET /api/v1/messages")
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	// TODO start, limit
 	switch apiv1.config.Storage.(type) {
@@ -107,9 +132,7 @@ func (apiv1 *APIv1) message(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
@@ -131,9 +154,7 @@ func (apiv1 *APIv1) download(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Type", "message/rfc822")
 	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+".eml\"")
@@ -166,9 +187,7 @@ func (apiv1 *APIv1) download_part(session *http.Session) {
 	log.Printf("[APIv1] GET /api/v1/messages/%s/mime/part/%d/download\n", id, part)
 
 	// TODO extension from content-type?
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+strconv.Itoa(part)+"\"")
 
@@ -197,9 +216,7 @@ func (apiv1 *APIv1) download_part(session *http.Session) {
 func (apiv1 *APIv1) delete_all(session *http.Session) {
 	log.Println("[APIv1] POST /api/v1/messages")
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {
@@ -217,9 +234,7 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] POST /api/v1/messages/%s/release\n", id)
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Type", "text/json")
 	var msg = &data.Message{}
@@ -267,9 +282,7 @@ func (apiv1 *APIv1) delete_one(session *http.Session) {
 	id := session.Stash["id"].(string)
 	log.Printf("[APIv1] POST /api/v1/messages/%s/delete\n", id)
 
-	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-	}
+	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {
