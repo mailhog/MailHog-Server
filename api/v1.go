@@ -26,6 +26,7 @@ type APIv1 struct {
 	app    *gotcha.App
 }
 
+// FIXME should probably move this into APIv1 struct
 var stream *goose.EventStream
 
 type ReleaseConfig struct {

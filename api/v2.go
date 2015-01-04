@@ -10,8 +10,6 @@ import (
 	"github.com/mailhog/MailHog-Server/config"
 	"github.com/mailhog/MailHog-Server/monkey"
 	"github.com/mailhog/data"
-
-	"github.com/ian-kent/goose"
 )
 
 // APIv2 implements version 2 of the MailHog API
@@ -30,7 +28,6 @@ func CreateAPIv2(conf *config.Config, app *gotcha.App) *APIv2 {
 		app:    app,
 	}
 
-	stream = goose.NewEventStream()
 	r := app.Router
 
 	r.Get("/api/v2/messages/?", apiv2.messages)
