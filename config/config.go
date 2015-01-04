@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"log"
 
 	"github.com/ian-kent/envconf"
@@ -26,20 +28,21 @@ func DefaultConfig() *Config {
 }
 
 type Config struct {
-	SMTPBindAddr string
-	APIBindAddr  string
-	Hostname     string
-	MongoUri     string
-	MongoDb      string
-	MongoColl    string
-	StorageType  string
-	CORSOrigin   string
-	InviteJim    bool
-	Storage      storage.Storage
-	MessageChan  chan *data.Message
-	Assets       func(asset string) ([]byte, error)
-	Monkey       monkey.ChaosMonkey
-	OutgoingSMTP map[string]*OutgoingSMTP
+	SMTPBindAddr     string
+	APIBindAddr      string
+	Hostname         string
+	MongoUri         string
+	MongoDb          string
+	MongoColl        string
+	StorageType      string
+	CORSOrigin       string
+	InviteJim        bool
+	Storage          storage.Storage
+	MessageChan      chan *data.Message
+	Assets           func(asset string) ([]byte, error)
+	Monkey           monkey.ChaosMonkey
+	OutgoingSMTPFile string
+	OutgoingSMTP     map[string]*OutgoingSMTP
 }
 
 type OutgoingSMTP struct {
@@ -82,6 +85,19 @@ func Configure() *Config {
 		cfg.Monkey = Jim
 	}
 
+	if len(cfg.OutgoingSMTPFile) > 0 {
+		b, err := ioutil.ReadFile(cfg.OutgoingSMTPFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var o map[string]*OutgoingSMTP
+		err = json.Unmarshal(b, &o)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cfg.OutgoingSMTP = o
+	}
+
 	return cfg
 }
 
@@ -95,5 +111,6 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MongoColl, "mongo-coll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
 	flag.StringVar(&cfg.CORSOrigin, "cors-origin", envconf.FromEnvP("MH_CORS_ORIGIN", "").(string), "CORS Access-Control-Allow-Origin header for API endpoints")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
+	flag.StringVar(&cfg.OutgoingSMTPFile, "outgoing-smtp", envconf.FromEnvP("MH_OUTGOING_SMTP", "").(string), "JSON file containing outgoing SMTP servers")
 	Jim.RegisterFlags()
 }
