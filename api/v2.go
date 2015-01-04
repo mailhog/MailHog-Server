@@ -8,6 +8,7 @@ import (
 	gotcha "github.com/ian-kent/gotcha/app"
 	"github.com/ian-kent/gotcha/http"
 	"github.com/mailhog/MailHog-Server/config"
+	"github.com/mailhog/MailHog-Server/monkey"
 	"github.com/mailhog/data"
 
 	"github.com/ian-kent/goose"
@@ -37,6 +38,12 @@ func CreateAPIv2(conf *config.Config, app *gotcha.App) *APIv2 {
 
 	r.Get("/api/v2/search/?", apiv2.search)
 	r.Options("/api/v2/search/?", apiv2.defaultOptions)
+
+	r.Get("/api/v2/jim/?", apiv2.jim)
+	r.Post("/api/v2/jim/?", apiv2.createJim)
+	r.Put("/api/v2/jim/?", apiv2.updateJim)
+	r.Delete("/api/v2/jim/?", apiv2.deleteJim)
+	r.Options("/api/v2/jim/?", apiv2.defaultOptions)
 
 	return apiv2
 }
@@ -125,7 +132,89 @@ func (apiv2 *APIv2) search(session *http.Session) {
 	res.Items = []data.Message(*messages)
 	res.Total = total
 
-	bytes, _ := json.Marshal(res)
-	session.Response.Headers.Add("Content-Type", "text/json")
-	session.Response.Write(bytes)
+	b, _ := json.Marshal(res)
+	session.Response.Headers.Add("Content-Type", "application/json")
+	session.Response.Write(b)
+}
+
+func (apiv2 *APIv2) jim(session *http.Session) {
+	log.Println("[APIv2] GET /jim")
+
+	apiv2.defaultOptions(session)
+
+	if apiv2.config.Monkey == nil {
+		session.Response.Status = 404
+		return
+	}
+
+	b, _ := json.Marshal(apiv2.config.Monkey)
+	session.Response.Headers.Add("Content-Type", "application/json")
+	session.Response.Write(b)
+}
+
+func (apiv2 *APIv2) deleteJim(session *http.Session) {
+	log.Println("[APIv2] DELETE /jim")
+
+	apiv2.defaultOptions(session)
+
+	if apiv2.config.Monkey == nil {
+		session.Response.Status = 404
+		return
+	}
+
+	apiv2.config.Monkey = nil
+}
+
+func (apiv2 *APIv2) createJim(session *http.Session) {
+	log.Println("[APIv2] POST /jim")
+
+	apiv2.defaultOptions(session)
+
+	if apiv2.config.Monkey != nil {
+		session.Response.Status = 400
+		return
+	}
+
+	apiv2.config.Monkey = config.Jim
+
+	// Try, but ignore errors
+	// Could be better (e.g., ok if no json, error if badly formed json)
+	// but this works for now
+	apiv2.newJimFromBody(session)
+
+	session.Response.Status = 201
+}
+
+func (apiv2 *APIv2) newJimFromBody(session *http.Session) error {
+	var jim monkey.Jim
+
+	dec := json.NewDecoder(session.Request.Body())
+	err := dec.Decode(&jim)
+
+	if err != nil {
+		return err
+	}
+
+	jim.ConfigureFrom(config.Jim)
+
+	config.Jim = &jim
+	apiv2.config.Monkey = &jim
+
+	return nil
+}
+
+func (apiv2 *APIv2) updateJim(session *http.Session) {
+	log.Println("[APIv2] PUT /jim")
+
+	apiv2.defaultOptions(session)
+
+	if apiv2.config.Monkey == nil {
+		session.Response.Status = 404
+		return
+	}
+
+	err := apiv2.newJimFromBody(session)
+	if err != nil {
+		session.Response.Status = 400
+	}
 }

@@ -11,27 +11,27 @@ import (
 
 // Jim is a chaos monkey
 type Jim struct {
-	disconnectChance      float64
-	acceptChance          float64
-	linkSpeedAffect       float64
-	linkSpeedMin          float64
-	linkSpeedMax          float64
-	rejectSenderChance    float64
-	rejectRecipientChance float64
-	rejectAuthChance      float64
+	DisconnectChance      float64
+	AcceptChance          float64
+	LinkSpeedAffect       float64
+	LinkSpeedMin          float64
+	LinkSpeedMax          float64
+	RejectSenderChance    float64
+	RejectRecipientChance float64
+	RejectAuthChance      float64
 	logf                  func(message string, args ...interface{})
 }
 
 // RegisterFlags implements ChaosMonkey.RegisterFlags
 func (j *Jim) RegisterFlags() {
-	flag.Float64Var(&j.disconnectChance, "jim-disconnect", 0.005, "Chance of disconnect")
-	flag.Float64Var(&j.acceptChance, "jim-accept", 0.99, "Chance of accept")
-	flag.Float64Var(&j.linkSpeedAffect, "jim-linkspeed-affect", 0.1, "Chance of affecting link speed")
-	flag.Float64Var(&j.linkSpeedMin, "jim-linkspeed-min", 1024, "Minimum link speed (in bytes per second)")
-	flag.Float64Var(&j.linkSpeedMax, "jim-linkspeed-max", 10240, "Maximum link speed (in bytes per second)")
-	flag.Float64Var(&j.rejectSenderChance, "jim-reject-sender", 0.05, "Chance of rejecting a sender (MAIL FROM)")
-	flag.Float64Var(&j.rejectRecipientChance, "jim-reject-recipient", 0.05, "Chance of rejecting a recipient (RCPT TO)")
-	flag.Float64Var(&j.rejectAuthChance, "jim-reject-auth", 0.05, "Chance of rejecting authentication (AUTH)")
+	flag.Float64Var(&j.DisconnectChance, "jim-disconnect", 0.005, "Chance of disconnect")
+	flag.Float64Var(&j.AcceptChance, "jim-accept", 0.99, "Chance of accept")
+	flag.Float64Var(&j.LinkSpeedAffect, "jim-linkspeed-affect", 0.1, "Chance of affecting link speed")
+	flag.Float64Var(&j.LinkSpeedMin, "jim-linkspeed-min", 1024, "Minimum link speed (in bytes per second)")
+	flag.Float64Var(&j.LinkSpeedMax, "jim-linkspeed-max", 10240, "Maximum link speed (in bytes per second)")
+	flag.Float64Var(&j.RejectSenderChance, "jim-reject-sender", 0.05, "Chance of rejecting a sender (MAIL FROM)")
+	flag.Float64Var(&j.RejectRecipientChance, "jim-reject-recipient", 0.05, "Chance of rejecting a recipient (RCPT TO)")
+	flag.Float64Var(&j.RejectAuthChance, "jim-reject-auth", 0.05, "Chance of rejecting authentication (AUTH)")
 }
 
 // Configure implements ChaosMonkey.Configure
@@ -40,9 +40,15 @@ func (j *Jim) Configure(logf func(string, ...interface{})) {
 	rand.Seed(time.Now().Unix())
 }
 
+// ConfigureFrom lets us configure a new Jim from an old one without
+// having to expose logf (and any other future private vars)
+func (j *Jim) ConfigureFrom(j2 *Jim) {
+	j.Configure(j2.logf)
+}
+
 // Accept implements ChaosMonkey.Accept
 func (j *Jim) Accept(conn net.Conn) bool {
-	if rand.Float64() > j.acceptChance {
+	if rand.Float64() > j.AcceptChance {
 		j.logf("Jim: Rejecting connection\n")
 		return false
 	}
@@ -53,9 +59,9 @@ func (j *Jim) Accept(conn net.Conn) bool {
 // LinkSpeed implements ChaosMonkey.LinkSpeed
 func (j *Jim) LinkSpeed() *linkio.Throughput {
 	rand.Seed(time.Now().Unix())
-	if rand.Float64() < j.linkSpeedAffect {
-		lsDiff := j.linkSpeedMax - j.linkSpeedMin
-		lsAffect := j.linkSpeedMin + (lsDiff * rand.Float64())
+	if rand.Float64() < j.LinkSpeedAffect {
+		lsDiff := j.LinkSpeedMax - j.LinkSpeedMin
+		lsAffect := j.LinkSpeedMin + (lsDiff * rand.Float64())
 		f := linkio.Throughput(lsAffect) * linkio.BytePerSecond
 		j.logf("Jim: Restricting throughput to %s\n", f)
 		return &f
@@ -66,7 +72,7 @@ func (j *Jim) LinkSpeed() *linkio.Throughput {
 
 // ValidRCPT implements ChaosMonkey.ValidRCPT
 func (j *Jim) ValidRCPT(rcpt string) bool {
-	if rand.Float64() < j.rejectRecipientChance {
+	if rand.Float64() < j.RejectRecipientChance {
 		j.logf("Jim: Rejecting recipient %s\n", rcpt)
 		return false
 	}
@@ -76,7 +82,7 @@ func (j *Jim) ValidRCPT(rcpt string) bool {
 
 // ValidMAIL implements ChaosMonkey.ValidMAIL
 func (j *Jim) ValidMAIL(mail string) bool {
-	if rand.Float64() < j.rejectSenderChance {
+	if rand.Float64() < j.RejectSenderChance {
 		j.logf("Jim: Rejecting sender %s\n", mail)
 		return false
 	}
@@ -86,7 +92,7 @@ func (j *Jim) ValidMAIL(mail string) bool {
 
 // ValidAUTH implements ChaosMonkey.ValidAUTH
 func (j *Jim) ValidAUTH(mechanism string, args ...string) bool {
-	if rand.Float64() < j.rejectAuthChance {
+	if rand.Float64() < j.RejectAuthChance {
 		j.logf("Jim: Rejecting authentication %s: %s\n", mechanism, args)
 		return false
 	}
@@ -96,7 +102,7 @@ func (j *Jim) ValidAUTH(mechanism string, args ...string) bool {
 
 // Disconnect implements ChaosMonkey.Disconnect
 func (j *Jim) Disconnect() bool {
-	if rand.Float64() < j.disconnectChance {
+	if rand.Float64() < j.DisconnectChance {
 		j.logf("Jim: Being nasty, kicking them off\n")
 		return true
 	}

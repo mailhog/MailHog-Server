@@ -41,7 +41,7 @@ type Config struct {
 }
 
 var cfg = DefaultConfig()
-var jim = &monkey.Jim{}
+var Jim = &monkey.Jim{}
 
 func Configure() *Config {
 	switch cfg.StorageType {
@@ -63,10 +63,10 @@ func Configure() *Config {
 	}
 
 	if cfg.InviteJim {
-		jim.Configure(func(message string, args ...interface{}) {
+		Jim.Configure(func(message string, args ...interface{}) {
 			log.Printf(message, args...)
 		})
-		cfg.Monkey = jim
+		cfg.Monkey = Jim
 	}
 
 	return cfg
@@ -82,5 +82,5 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MongoColl, "mongo-coll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
 	flag.StringVar(&cfg.CORSOrigin, "cors-origin", envconf.FromEnvP("MH_CORS_ORIGIN", "").(string), "CORS Access-Control-Allow-Origin header for API endpoints")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
-	jim.RegisterFlags()
+	Jim.RegisterFlags()
 }
