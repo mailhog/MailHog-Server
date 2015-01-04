@@ -9,7 +9,6 @@ import (
 	gotcha "github.com/ian-kent/gotcha/app"
 	"github.com/ian-kent/gotcha/http"
 	"github.com/mailhog/MailHog-Server/config"
-	"github.com/mailhog/data"
 	"github.com/mailhog/storage"
 
 	"github.com/ian-kent/goose"
@@ -30,9 +29,12 @@ type APIv1 struct {
 var stream *goose.EventStream
 
 type ReleaseConfig struct {
-	Email string
-	Host  string
-	Port  string
+	Email     string
+	Host      string
+	Port      string
+	Username  string
+	Password  string
+	Mechanism string
 }
 
 func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
@@ -238,16 +240,7 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 	apiv1.defaultOptions(session)
 
 	session.Response.Headers.Add("Content-Type", "text/json")
-	var msg = &data.Message{}
-	switch apiv1.config.Storage.(type) {
-	case *storage.MongoDB:
-		msg, _ = apiv1.config.Storage.(*storage.MongoDB).Load(id)
-	case *storage.InMemory:
-		msg, _ = apiv1.config.Storage.(*storage.InMemory).Load(id)
-	default:
-		session.Response.Status = 500
-		return
-	}
+	msg, _ := apiv1.config.Storage.Load(id)
 
 	decoder := json.NewDecoder(session.Request.Body())
 	var cfg ReleaseConfig
@@ -270,7 +263,23 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 	}
 	bytes = append(bytes, []byte("\r\n"+msg.Content.Body)...)
 
-	err = smtp.SendMail(cfg.Host+":"+cfg.Port, nil, "nobody@"+apiv1.config.Hostname, []string{cfg.Email}, bytes)
+	var auth smtp.Auth
+
+	if len(cfg.Username) > 0 || len(cfg.Password) > 0 {
+		log.Printf("Found username/password, using auth mechanism: [%s]", cfg.Mechanism)
+		switch cfg.Mechanism {
+		case "CRAMMD5":
+			auth = smtp.CRAMMD5Auth(cfg.Username, cfg.Password)
+		case "PLAIN":
+			auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+		default:
+			log.Printf("Error - invalid authentication mechanism")
+			session.Response.Status = 400
+			return
+		}
+	}
+
+	err = smtp.SendMail(cfg.Host+":"+cfg.Port, auth, "nobody@"+apiv1.config.Hostname, []string{cfg.Email}, bytes)
 	if err != nil {
 		log.Printf("Failed to release message: %s", err)
 		session.Response.Status = 500
