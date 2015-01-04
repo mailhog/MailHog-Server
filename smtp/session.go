@@ -54,6 +54,7 @@ func Accept(remoteAddress string, conn io.ReadWriteCloser, storage storage.Stora
 	proto.ValidateSenderHandler = session.validateSender
 	proto.ValidateRecipientHandler = session.validateRecipient
 	proto.ValidateAuthenticationHandler = session.validateAuthentication
+	proto.GetAuthenticationMechanismsHandler = func() []string { return []string{"PLAIN"} }
 
 	session.logf("Starting session")
 	session.Write(proto.Start())
@@ -133,7 +134,7 @@ func (c *Session) Read() bool {
 
 	c.line += text
 
-	for strings.Contains(c.line, "\n") {
+	for strings.Contains(c.line, "\r\n") {
 		line, reply := c.proto.Parse(c.line)
 		c.line = line
 
