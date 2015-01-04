@@ -28,14 +28,8 @@ type APIv1 struct {
 // FIXME should probably move this into APIv1 struct
 var stream *goose.EventStream
 
-type ReleaseConfig struct {
-	Email     string
-	Host      string
-	Port      string
-	Username  string
-	Password  string
-	Mechanism string
-}
+// ReleaseConfig is an alias to preserve go package API
+type ReleaseConfig config.OutgoingSMTP
 
 func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
 	log.Println("Creating API v1")
@@ -252,8 +246,41 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 		return
 	}
 
-	log.Printf("Releasing to %s (via %s:%s)", cfg.Email, cfg.Host, cfg.Port)
+	log.Printf("%+v", cfg)
+
 	log.Printf("Got message: %s", msg.ID)
+
+	if cfg.Save {
+		if _, ok := apiv1.config.OutgoingSMTP[cfg.Name]; ok {
+			log.Printf("Server already exists named %s", cfg.Name)
+			session.Response.Status = 400
+			return
+		}
+		cf := config.OutgoingSMTP(cfg)
+		apiv1.config.OutgoingSMTP[cfg.Name] = &cf
+		log.Printf("Saved server with name %s", cfg.Name)
+	}
+
+	if len(cfg.Name) > 0 {
+		if c, ok := apiv1.config.OutgoingSMTP[cfg.Name]; ok {
+			log.Printf("Using server with name: %s", cfg.Name)
+			cfg.Name = c.Name
+			if len(cfg.Email) == 0 {
+				cfg.Email = c.Email
+			}
+			cfg.Host = c.Host
+			cfg.Port = c.Port
+			cfg.Username = c.Username
+			cfg.Password = c.Password
+			cfg.Mechanism = c.Mechanism
+		} else {
+			log.Printf("Server not found: %s", cfg.Name)
+			session.Response.Status = 400
+			return
+		}
+	}
+
+	log.Printf("Releasing to %s (via %s:%s)", cfg.Email, cfg.Host, cfg.Port)
 
 	bytes := make([]byte, 0)
 	for h, l := range msg.Content.Headers {

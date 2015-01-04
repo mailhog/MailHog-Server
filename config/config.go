@@ -21,6 +21,7 @@ func DefaultConfig() *Config {
 		StorageType:  "memory",
 		CORSOrigin:   "",
 		MessageChan:  make(chan *data.Message),
+		OutgoingSMTP: make(map[string]*OutgoingSMTP),
 	}
 }
 
@@ -38,6 +39,18 @@ type Config struct {
 	MessageChan  chan *data.Message
 	Assets       func(asset string) ([]byte, error)
 	Monkey       monkey.ChaosMonkey
+	OutgoingSMTP map[string]*OutgoingSMTP
+}
+
+type OutgoingSMTP struct {
+	Name      string
+	Save      bool
+	Email     string
+	Host      string
+	Port      string
+	Username  string
+	Password  string
+	Mechanism string
 }
 
 var cfg = DefaultConfig()

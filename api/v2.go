@@ -42,13 +42,16 @@ func CreateAPIv2(conf *config.Config, app *gotcha.App) *APIv2 {
 	r.Delete("/api/v2/jim/?", apiv2.deleteJim)
 	r.Options("/api/v2/jim/?", apiv2.defaultOptions)
 
+	r.Get("/api/v2/outgoing-smtp/?", apiv2.listOutgoingSMTP)
+	r.Options("/api/v2/outgoing-smtp/?", apiv2.defaultOptions)
+
 	return apiv2
 }
 
 func (apiv2 *APIv2) defaultOptions(session *http.Session) {
 	if len(apiv2.config.CORSOrigin) > 0 {
 		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv2.config.CORSOrigin)
-		session.Response.Headers.Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
+		session.Response.Headers.Add("Access-Control-Allow-Methods", "OPTIONS,GET,PUT,POST,DELETE")
 		session.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
 	}
 }
@@ -135,7 +138,7 @@ func (apiv2 *APIv2) search(session *http.Session) {
 }
 
 func (apiv2 *APIv2) jim(session *http.Session) {
-	log.Println("[APIv2] GET /jim")
+	log.Println("[APIv2] GET /api/v2/jim")
 
 	apiv2.defaultOptions(session)
 
@@ -150,7 +153,7 @@ func (apiv2 *APIv2) jim(session *http.Session) {
 }
 
 func (apiv2 *APIv2) deleteJim(session *http.Session) {
-	log.Println("[APIv2] DELETE /jim")
+	log.Println("[APIv2] DELETE /api/v2/jim")
 
 	apiv2.defaultOptions(session)
 
@@ -163,7 +166,7 @@ func (apiv2 *APIv2) deleteJim(session *http.Session) {
 }
 
 func (apiv2 *APIv2) createJim(session *http.Session) {
-	log.Println("[APIv2] POST /jim")
+	log.Println("[APIv2] POST /api/v2/jim")
 
 	apiv2.defaultOptions(session)
 
@@ -201,7 +204,7 @@ func (apiv2 *APIv2) newJimFromBody(session *http.Session) error {
 }
 
 func (apiv2 *APIv2) updateJim(session *http.Session) {
-	log.Println("[APIv2] PUT /jim")
+	log.Println("[APIv2] PUT /api/v2/jim")
 
 	apiv2.defaultOptions(session)
 
@@ -214,4 +217,14 @@ func (apiv2 *APIv2) updateJim(session *http.Session) {
 	if err != nil {
 		session.Response.Status = 400
 	}
+}
+
+func (apiv2 *APIv2) listOutgoingSMTP(session *http.Session) {
+	log.Println("[APIv2] GET /api/v2/outgoing-smtp")
+
+	apiv2.defaultOptions(session)
+
+	b, _ := json.Marshal(apiv2.config.OutgoingSMTP)
+	session.Response.Headers.Add("Content-Type", "application/json")
+	session.Response.Write(b)
 }
