@@ -1,9 +1,11 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/smtp"
 	"strconv"
+	"strings"
 
 	"github.com/ian-kent/go-log/log"
 	gotcha "github.com/ian-kent/gotcha/app"
@@ -188,26 +190,25 @@ func (apiv1 *APIv1) download_part(session *http.Session) {
 
 	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+strconv.Itoa(part)+"\"")
 
-	switch apiv1.config.Storage.(type) {
-	case *storage.MongoDB:
-		message, _ := apiv1.config.Storage.(*storage.MongoDB).Load(id)
-		for h, l := range message.MIME.Parts[part].Headers {
-			for _, v := range l {
-				session.Response.Headers.Add(h, v)
+	message, _ := apiv1.config.Storage.Load(id)
+	contentTransferEncoding := ""
+	for h, l := range message.MIME.Parts[part].Headers {
+		for _, v := range l {
+			if strings.ToLower(h) == "content-transfer-encoding" && contentTransferEncoding == "" {
+				contentTransferEncoding = v
 			}
+			session.Response.Headers.Add(h, v)
 		}
-		session.Response.Write([]byte("\r\n" + message.MIME.Parts[part].Body))
-	case *storage.InMemory:
-		message, _ := apiv1.config.Storage.(*storage.InMemory).Load(id)
-		for h, l := range message.MIME.Parts[part].Headers {
-			for _, v := range l {
-				session.Response.Headers.Add(h, v)
-			}
-		}
-		session.Response.Write([]byte("\r\n" + message.MIME.Parts[part].Body))
-	default:
-		session.Response.Status = 500
 	}
+	body := []byte(message.MIME.Parts[part].Body)
+	if strings.ToLower(contentTransferEncoding) == "base64" {
+		var e error
+		body, e = base64.StdEncoding.DecodeString(message.MIME.Parts[part].Body)
+		if e != nil {
+			log.Printf("[APIv1] Decoding base64 encoded body failed: %s", e)
+		}
+	}
+	session.Response.Write(body)
 }
 
 func (apiv1 *APIv1) delete_all(session *http.Session) {
