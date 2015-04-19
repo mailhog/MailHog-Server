@@ -15,7 +15,6 @@ deps:
 	go get github.com/mailhog/MailHog-Server
 	go get github.com/mailhog/MailHog-UI
 	go get github.com/mailhog/http
-	go get github.com/ian-kent/gotcha/gotcha
 	go get github.com/ian-kent/go-log/log
 	go get github.com/ian-kent/envconf
 	go get github.com/ian-kent/goose

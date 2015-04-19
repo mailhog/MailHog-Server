@@ -4,8 +4,10 @@ import (
 	"flag"
 	"os"
 
+	gohttp "net/http"
+
+	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
-	gotcha "github.com/ian-kent/gotcha/app"
 	"github.com/mailhog/MailHog-Server/api"
 	"github.com/mailhog/MailHog-Server/config"
 	"github.com/mailhog/MailHog-Server/smtp"
@@ -26,9 +28,9 @@ func main() {
 	configure()
 
 	exitCh = make(chan int)
-	cb := func(app *gotcha.App) {
-		api.CreateAPIv1(conf, app)
-		api.CreateAPIv2(conf, app)
+	cb := func(r gohttp.Handler) {
+		api.CreateAPIv1(conf, r.(*pat.Router))
+		api.CreateAPIv2(conf, r.(*pat.Router))
 	}
 	go http.Listen(conf.APIBindAddr, assets.Asset, exitCh, cb)
 	go smtp.Listen(conf, exitCh)

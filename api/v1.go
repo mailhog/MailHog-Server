@@ -3,13 +3,13 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/smtp"
 	"strconv"
 	"strings"
 
+	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
-	gotcha "github.com/ian-kent/gotcha/app"
-	"github.com/ian-kent/gotcha/http"
 	"github.com/mailhog/MailHog-Server/config"
 	"github.com/mailhog/storage"
 
@@ -24,7 +24,6 @@ import (
 // Any changes/additions should be added in APIv2.
 type APIv1 struct {
 	config *config.Config
-	app    *gotcha.App
 }
 
 // FIXME should probably move this into APIv1 struct
@@ -33,35 +32,33 @@ var stream *goose.EventStream
 // ReleaseConfig is an alias to preserve go package API
 type ReleaseConfig config.OutgoingSMTP
 
-func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
+func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
 	log.Println("Creating API v1")
 	apiv1 := &APIv1{
 		config: conf,
-		app:    app,
 	}
 
 	stream = goose.NewEventStream()
-	r := app.Router
 
-	r.Get("/api/v1/messages/?", apiv1.messages)
-	r.Delete("/api/v1/messages/?", apiv1.delete_all)
-	r.Options("/api/v1/messages/?", apiv1.defaultOptions)
+	r.Path("/api/v1/messages").Methods("GET").HandlerFunc(apiv1.messages)
+	r.Path("/api/v1/messages").Methods("DELETE").HandlerFunc(apiv1.delete_all)
+	r.Path("/api/v1/messages").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Get("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.message)
-	r.Delete("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.delete_one)
-	r.Options("/api/v1/messages/(?P<id>[^/]+)/?", apiv1.defaultOptions)
+	r.Path("/api/v1/messages/{id}").Methods("GET").HandlerFunc(apiv1.message)
+	r.Path("/api/v1/messages/{id}").Methods("DELETE").HandlerFunc(apiv1.delete_one)
+	r.Path("/api/v1/messages/{id}").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Get("/api/v1/messages/(?P<id>[^/]+)/download/?", apiv1.download)
-	r.Options("/api/v1/messages/(?P<id>[^/]+)/download/?", apiv1.defaultOptions)
+	r.Path("/api/v1/messages/{id}/download").Methods("GET").HandlerFunc(apiv1.download)
+	r.Path("/api/v1/messages/{id}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Get("/api/v1/messages/(?P<id>[^/]+)/mime/part/(?P<part>\\d+)/download/?", apiv1.download_part)
-	r.Options("/api/v1/messages/(?P<id>[^/]+)/mime/part/(?P<part>\\d+)/download/?", apiv1.defaultOptions)
+	r.Path("/api/v1/messages/{id}/mime/part/{part}/download").Methods("GET").HandlerFunc(apiv1.download_part)
+	r.Path("/api/v1/messages/{id}/mime/part/{part}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Post("/api/v1/messages/(?P<id>[^/]+)/release/?", apiv1.release_one)
-	r.Options("/api/v1/messages/(?P<id>[^/]+)/release/?", apiv1.defaultOptions)
+	r.Path("/api/v1/messages/{id}/release").Methods("POST").HandlerFunc(apiv1.release_one)
+	r.Path("/api/v1/messages/{id}/release").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Get("/api/v1/events/?", apiv1.eventstream)
-	r.Options("/api/v1/events/?", apiv1.defaultOptions)
+	r.Path("/api/v1/events").Methods("GET").HandlerFunc(apiv1.eventstream)
+	r.Path("/api/v1/events").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
 	go func() {
 		for {
@@ -79,11 +76,11 @@ func CreateAPIv1(conf *config.Config, app *gotcha.App) *APIv1 {
 	return apiv1
 }
 
-func (apiv1 *APIv1) defaultOptions(session *http.Session) {
+func (apiv1 *APIv1) defaultOptions(w http.ResponseWriter, req *http.Request) {
 	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.Headers.Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-		session.Response.Headers.Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
-		session.Response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
+		w.Header().Add("Access-Control-Allow-Headers", "Content-Type")
 	}
 }
 
@@ -93,157 +90,158 @@ func (apiv1 *APIv1) broadcast(json string) {
 	stream.Notify("data", b)
 }
 
-func (apiv1 *APIv1) eventstream(session *http.Session) {
+func (apiv1 *APIv1) eventstream(w http.ResponseWriter, req *http.Request) {
 	log.Println("[APIv1] GET /api/v1/events")
 
 	//apiv1.defaultOptions(session)
 	if len(apiv1.config.CORSOrigin) > 0 {
-		session.Response.GetWriter().Header().Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
-		session.Response.GetWriter().Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
+		w.Header().Add("Access-Control-Allow-Origin", apiv1.config.CORSOrigin)
+		w.Header().Add("Access-Control-Allow-Methods", "OPTIONS,GET,POST,DELETE")
 	}
 
-	stream.AddReceiver(session.Response.GetWriter())
+	stream.AddReceiver(w)
 }
 
-func (apiv1 *APIv1) messages(session *http.Session) {
+func (apiv1 *APIv1) messages(w http.ResponseWriter, req *http.Request) {
 	log.Println("[APIv1] GET /api/v1/messages")
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
 	// TODO start, limit
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		messages, _ := apiv1.config.Storage.(*storage.MongoDB).List(0, 1000)
 		bytes, _ := json.Marshal(messages)
-		session.Response.Headers.Add("Content-Type", "text/json")
-		session.Response.Write(bytes)
+		w.Header().Add("Content-Type", "text/json")
+		w.Write(bytes)
 	case *storage.InMemory:
 		messages, _ := apiv1.config.Storage.(*storage.InMemory).List(0, 1000)
 		bytes, _ := json.Marshal(messages)
-		session.Response.Headers.Add("Content-Type", "text/json")
-		session.Response.Write(bytes)
+		w.Header().Add("Content-Type", "text/json")
+		w.Write(bytes)
 	default:
-		session.Response.Status = 500
+		w.WriteHeader(500)
 	}
 }
 
-func (apiv1 *APIv1) message(session *http.Session) {
-	id := session.Stash["id"].(string)
+func (apiv1 *APIv1) message(w http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get(":id")
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		message, _ := apiv1.config.Storage.(*storage.MongoDB).Load(id)
 		bytes, _ := json.Marshal(message)
-		session.Response.Headers.Add("Content-Type", "text/json")
-		session.Response.Write(bytes)
+		w.Header().Add("Content-Type", "text/json")
+		w.Write(bytes)
 	case *storage.InMemory:
 		message, _ := apiv1.config.Storage.(*storage.InMemory).Load(id)
 		bytes, _ := json.Marshal(message)
-		session.Response.Headers.Add("Content-Type", "text/json")
-		session.Response.Write(bytes)
+		w.Header().Add("Content-Type", "text/json")
+		w.Write(bytes)
 	default:
-		session.Response.Status = 500
+		w.WriteHeader(500)
 	}
 }
 
-func (apiv1 *APIv1) download(session *http.Session) {
-	id := session.Stash["id"].(string)
+func (apiv1 *APIv1) download(w http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get(":id")
 	log.Printf("[APIv1] GET /api/v1/messages/%s\n", id)
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
-	session.Response.Headers.Add("Content-Type", "message/rfc822")
-	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+".eml\"")
+	w.Header().Add("Content-Type", "message/rfc822")
+	w.Header().Add("Content-Disposition", "attachment; filename=\""+id+".eml\"")
 
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		message, _ := apiv1.config.Storage.(*storage.MongoDB).Load(id)
 		for h, l := range message.Content.Headers {
 			for _, v := range l {
-				session.Response.Write([]byte(h + ": " + v + "\r\n"))
+				w.Write([]byte(h + ": " + v + "\r\n"))
 			}
 		}
-		session.Response.Write([]byte("\r\n" + message.Content.Body))
+		w.Write([]byte("\r\n" + message.Content.Body))
 	case *storage.InMemory:
 		message, _ := apiv1.config.Storage.(*storage.InMemory).Load(id)
 		for h, l := range message.Content.Headers {
 			for _, v := range l {
-				session.Response.Write([]byte(h + ": " + v + "\r\n"))
+				w.Write([]byte(h + ": " + v + "\r\n"))
 			}
 		}
-		session.Response.Write([]byte("\r\n" + message.Content.Body))
+		w.Write([]byte("\r\n" + message.Content.Body))
 	default:
-		session.Response.Status = 500
+		w.WriteHeader(500)
 	}
 }
 
-func (apiv1 *APIv1) download_part(session *http.Session) {
-	id := session.Stash["id"].(string)
-	part, _ := strconv.Atoi(session.Stash["part"].(string))
-	log.Printf("[APIv1] GET /api/v1/messages/%s/mime/part/%d/download\n", id, part)
+func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get(":id")
+	part := req.URL.Query().Get(":part")
+	log.Printf("[APIv1] GET /api/v1/messages/%s/mime/part/%s/download\n", id, part)
 
 	// TODO extension from content-type?
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
-	session.Response.Headers.Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+strconv.Itoa(part)+"\"")
+	w.Header().Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+part+"\"")
 
 	message, _ := apiv1.config.Storage.Load(id)
 	contentTransferEncoding := ""
-	for h, l := range message.MIME.Parts[part].Headers {
+	pid, _ := strconv.Atoi(part)
+	for h, l := range message.MIME.Parts[pid].Headers {
 		for _, v := range l {
 			if strings.ToLower(h) == "content-transfer-encoding" && contentTransferEncoding == "" {
 				contentTransferEncoding = v
 			}
-			session.Response.Headers.Add(h, v)
+			w.Header().Add(h, v)
 		}
 	}
-	body := []byte(message.MIME.Parts[part].Body)
+	body := []byte(message.MIME.Parts[pid].Body)
 	if strings.ToLower(contentTransferEncoding) == "base64" {
 		var e error
-		body, e = base64.StdEncoding.DecodeString(message.MIME.Parts[part].Body)
+		body, e = base64.StdEncoding.DecodeString(message.MIME.Parts[pid].Body)
 		if e != nil {
 			log.Printf("[APIv1] Decoding base64 encoded body failed: %s", e)
 		}
 	}
-	session.Response.Write(body)
+	w.Write(body)
 }
 
-func (apiv1 *APIv1) delete_all(session *http.Session) {
+func (apiv1 *APIv1) delete_all(w http.ResponseWriter, req *http.Request) {
 	log.Println("[APIv1] POST /api/v1/messages")
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
-	session.Response.Headers.Add("Content-Type", "text/json")
+	w.Header().Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		apiv1.config.Storage.(*storage.MongoDB).DeleteAll()
 	case *storage.InMemory:
 		apiv1.config.Storage.(*storage.InMemory).DeleteAll()
 	default:
-		session.Response.Status = 500
+		w.WriteHeader(500)
 		return
 	}
 }
 
-func (apiv1 *APIv1) release_one(session *http.Session) {
-	id := session.Stash["id"].(string)
+func (apiv1 *APIv1) release_one(w http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get(":id")
 	log.Printf("[APIv1] POST /api/v1/messages/%s/release\n", id)
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
-	session.Response.Headers.Add("Content-Type", "text/json")
+	w.Header().Add("Content-Type", "text/json")
 	msg, _ := apiv1.config.Storage.Load(id)
 
-	decoder := json.NewDecoder(session.Request.Body())
+	decoder := json.NewDecoder(req.Body)
 	var cfg ReleaseConfig
 	err := decoder.Decode(&cfg)
 	if err != nil {
 		log.Printf("Error decoding request body: %s", err)
-		session.Response.Status = 500
-		session.Response.Write([]byte("Error decoding request body"))
+		w.WriteHeader(500)
+		w.Write([]byte("Error decoding request body"))
 		return
 	}
 
@@ -254,7 +252,7 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 	if cfg.Save {
 		if _, ok := apiv1.config.OutgoingSMTP[cfg.Name]; ok {
 			log.Printf("Server already exists named %s", cfg.Name)
-			session.Response.Status = 400
+			w.WriteHeader(400)
 			return
 		}
 		cf := config.OutgoingSMTP(cfg)
@@ -276,7 +274,7 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 			cfg.Mechanism = c.Mechanism
 		} else {
 			log.Printf("Server not found: %s", cfg.Name)
-			session.Response.Status = 400
+			w.WriteHeader(400)
 			return
 		}
 	}
@@ -302,7 +300,7 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 			auth = smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
 		default:
 			log.Printf("Error - invalid authentication mechanism")
-			session.Response.Status = 400
+			w.WriteHeader(400)
 			return
 		}
 	}
@@ -310,25 +308,26 @@ func (apiv1 *APIv1) release_one(session *http.Session) {
 	err = smtp.SendMail(cfg.Host+":"+cfg.Port, auth, "nobody@"+apiv1.config.Hostname, []string{cfg.Email}, bytes)
 	if err != nil {
 		log.Printf("Failed to release message: %s", err)
-		session.Response.Status = 500
+		w.WriteHeader(500)
 		return
 	}
 	log.Printf("Message released successfully")
 }
 
-func (apiv1 *APIv1) delete_one(session *http.Session) {
-	id := session.Stash["id"].(string)
+func (apiv1 *APIv1) delete_one(w http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get(":id")
+
 	log.Printf("[APIv1] POST /api/v1/messages/%s/delete\n", id)
 
-	apiv1.defaultOptions(session)
+	apiv1.defaultOptions(w, req)
 
-	session.Response.Headers.Add("Content-Type", "text/json")
+	w.Header().Add("Content-Type", "text/json")
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
 		apiv1.config.Storage.(*storage.MongoDB).DeleteOne(id)
 	case *storage.InMemory:
 		apiv1.config.Storage.(*storage.InMemory).DeleteOne(id)
 	default:
-		session.Response.Status = 500
+		w.WriteHeader(500)
 	}
 }
