@@ -152,8 +152,8 @@ func (apiv1 *APIv1) download(w http.ResponseWriter, req *http.Request) {
 
 	apiv1.defaultOptions(w, req)
 
-	w.Header().Add("Content-Type", "message/rfc822")
-	w.Header().Add("Content-Disposition", "attachment; filename=\""+id+".eml\"")
+	w.Header().Set("Content-Type", "message/rfc822")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+id+".eml\"")
 
 	switch apiv1.config.Storage.(type) {
 	case *storage.MongoDB:
@@ -185,17 +185,25 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 	// TODO extension from content-type?
 	apiv1.defaultOptions(w, req)
 
-	w.Header().Add("Content-Disposition", "attachment; filename=\""+id+"-part-"+part+"\"")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+id+"-part-"+part+"\"")
 
 	message, _ := apiv1.config.Storage.Load(id)
 	contentTransferEncoding := ""
 	pid, _ := strconv.Atoi(part)
 	for h, l := range message.MIME.Parts[pid].Headers {
 		for _, v := range l {
-			if strings.ToLower(h) == "content-transfer-encoding" && contentTransferEncoding == "" {
-				contentTransferEncoding = v
+			switch strings.ToLower(h) {
+			case "content-disposition":
+				// Prevent duplicate "content-disposition"
+				w.Header().Set(h, v)
+			case "content-transfer-encoding":
+				if contentTransferEncoding == "" {
+					contentTransferEncoding = v
+				}
+				fallthrough
+			default:
+				w.Header().Add(h, v)
 			}
-			w.Header().Add(h, v)
 		}
 	}
 	body := []byte(message.MIME.Parts[pid].Body)
