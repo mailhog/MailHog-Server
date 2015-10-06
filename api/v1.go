@@ -130,20 +130,22 @@ func (apiv1 *APIv1) message(w http.ResponseWriter, req *http.Request) {
 
 	apiv1.defaultOptions(w, req)
 
-	switch apiv1.config.Storage.(type) {
-	case *storage.MongoDB:
-		message, _ := apiv1.config.Storage.(*storage.MongoDB).Load(id)
-		bytes, _ := json.Marshal(message)
-		w.Header().Add("Content-Type", "text/json")
-		w.Write(bytes)
-	case *storage.InMemory:
-		message, _ := apiv1.config.Storage.(*storage.InMemory).Load(id)
-		bytes, _ := json.Marshal(message)
-		w.Header().Add("Content-Type", "text/json")
-		w.Write(bytes)
-	default:
+	message, err := apiv1.config.Storage.Load(id)
+	if err != nil {
+		log.Printf("- Error: %s", err)
 		w.WriteHeader(500)
+		return
 	}
+
+	bytes, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("- Error: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/json")
+	w.Write(bytes)
 }
 
 func (apiv1 *APIv1) download(w http.ResponseWriter, req *http.Request) {
