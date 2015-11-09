@@ -7,6 +7,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
@@ -61,6 +62,7 @@ func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
 	r.Path("/api/v1/events").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
 	go func() {
+		keepaliveTicker := time.Tick(time.Minute)
 		for {
 			select {
 			case msg := <-apiv1.config.MessageChan:
@@ -69,6 +71,8 @@ func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
 				json := string(bytes)
 				log.Printf("Sending content: %s\n", json)
 				apiv1.broadcast(json)
+			case <-keepaliveTicker:
+				apiv1.keepalive()
 			}
 		}
 	}()
@@ -88,6 +92,16 @@ func (apiv1 *APIv1) broadcast(json string) {
 	log.Println("[APIv1] BROADCAST /api/v1/events")
 	b := []byte(json)
 	stream.Notify("data", b)
+}
+
+// keepalive sends an empty keep alive message.
+//
+// This not only can keep connections alive, but also will detect broken
+// connections. Without this it is possible for the server to become
+// unresponsive due to too many open files.
+func (apiv1 *APIv1) keepalive() {
+	log.Println("[APIv1] KEEPALIVE /api/v1/events")
+	stream.Notify("keepalive", []byte{})
 }
 
 func (apiv1 *APIv1) eventstream(w http.ResponseWriter, req *http.Request) {
