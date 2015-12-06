@@ -78,10 +78,10 @@ func Configure() *Config {
 		log.Fatalf("Invalid storage type %s", cfg.StorageType)
 	}
 
+	Jim.Configure(func(message string, args ...interface{}) {
+		log.Printf(message, args...)
+	})
 	if cfg.InviteJim {
-		Jim.Configure(func(message string, args ...interface{}) {
-			log.Printf(message, args...)
-		})
 		cfg.Monkey = Jim
 	}
 
