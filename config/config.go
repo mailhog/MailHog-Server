@@ -22,6 +22,7 @@ func DefaultConfig() *Config {
 		MongoColl:    "messages",
 		StorageType:  "memory",
 		CORSOrigin:   "",
+		WebPath:      "",
 		MessageChan:  make(chan *data.Message),
 		OutgoingSMTP: make(map[string]*OutgoingSMTP),
 	}
@@ -43,6 +44,7 @@ type Config struct {
 	Monkey           monkey.ChaosMonkey
 	OutgoingSMTPFile string
 	OutgoingSMTP     map[string]*OutgoingSMTP
+	WebPath          string
 }
 
 type OutgoingSMTP struct {

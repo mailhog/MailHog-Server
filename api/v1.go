@@ -33,32 +33,32 @@ var stream *goose.EventStream
 type ReleaseConfig config.OutgoingSMTP
 
 func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
-	log.Println("Creating API v1")
+	log.Println("Creating API v1 with WebPath: " + conf.WebPath)
 	apiv1 := &APIv1{
 		config: conf,
 	}
 
 	stream = goose.NewEventStream()
 
-	r.Path("/api/v1/messages").Methods("GET").HandlerFunc(apiv1.messages)
-	r.Path("/api/v1/messages").Methods("DELETE").HandlerFunc(apiv1.delete_all)
-	r.Path("/api/v1/messages").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/messages").Methods("GET").HandlerFunc(apiv1.messages)
+	r.Path(conf.WebPath + "/api/v1/messages").Methods("DELETE").HandlerFunc(apiv1.delete_all)
+	r.Path(conf.WebPath + "/api/v1/messages").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Path("/api/v1/messages/{id}").Methods("GET").HandlerFunc(apiv1.message)
-	r.Path("/api/v1/messages/{id}").Methods("DELETE").HandlerFunc(apiv1.delete_one)
-	r.Path("/api/v1/messages/{id}").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}").Methods("GET").HandlerFunc(apiv1.message)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}").Methods("DELETE").HandlerFunc(apiv1.delete_one)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Path("/api/v1/messages/{id}/download").Methods("GET").HandlerFunc(apiv1.download)
-	r.Path("/api/v1/messages/{id}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/download").Methods("GET").HandlerFunc(apiv1.download)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Path("/api/v1/messages/{id}/mime/part/{part}/download").Methods("GET").HandlerFunc(apiv1.download_part)
-	r.Path("/api/v1/messages/{id}/mime/part/{part}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/mime/part/{part}/download").Methods("GET").HandlerFunc(apiv1.download_part)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/mime/part/{part}/download").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Path("/api/v1/messages/{id}/release").Methods("POST").HandlerFunc(apiv1.release_one)
-	r.Path("/api/v1/messages/{id}/release").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/release").Methods("POST").HandlerFunc(apiv1.release_one)
+	r.Path(conf.WebPath + "/api/v1/messages/{id}/release").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
-	r.Path("/api/v1/events").Methods("GET").HandlerFunc(apiv1.eventstream)
-	r.Path("/api/v1/events").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
+	r.Path(conf.WebPath + "/api/v1/events").Methods("GET").HandlerFunc(apiv1.eventstream)
+	r.Path(conf.WebPath + "/api/v1/events").Methods("OPTIONS").HandlerFunc(apiv1.defaultOptions)
 
 	go func() {
 		for {

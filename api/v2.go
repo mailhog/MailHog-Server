@@ -21,25 +21,25 @@ type APIv2 struct {
 }
 
 func CreateAPIv2(conf *config.Config, r *pat.Router) *APIv2 {
-	log.Println("Creating API v2")
+	log.Println("Creating API v2  with WebPath: " + conf.WebPath)
 	apiv2 := &APIv2{
 		config: conf,
 	}
 
-	r.Path("/api/v2/messages").Methods("GET").HandlerFunc(apiv2.messages)
-	r.Path("/api/v2/messages").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
+	r.Path(conf.WebPath + "/api/v2/messages").Methods("GET").HandlerFunc(apiv2.messages)
+	r.Path(conf.WebPath + "/api/v2/messages").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
 
-	r.Path("/api/v2/search").Methods("GET").HandlerFunc(apiv2.search)
-	r.Path("/api/v2/search").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
+	r.Path(conf.WebPath + "/api/v2/search").Methods("GET").HandlerFunc(apiv2.search)
+	r.Path(conf.WebPath + "/api/v2/search").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
 
-	r.Path("/api/v2/jim").Methods("GET").HandlerFunc(apiv2.jim)
-	r.Path("/api/v2/jim").Methods("POST").HandlerFunc(apiv2.createJim)
-	r.Path("/api/v2/jim").Methods("PUT").HandlerFunc(apiv2.updateJim)
-	r.Path("/api/v2/jim").Methods("DELETE").HandlerFunc(apiv2.deleteJim)
-	r.Path("/api/v2/jim").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
+	r.Path(conf.WebPath + "/api/v2/jim").Methods("GET").HandlerFunc(apiv2.jim)
+	r.Path(conf.WebPath + "/api/v2/jim").Methods("POST").HandlerFunc(apiv2.createJim)
+	r.Path(conf.WebPath + "/api/v2/jim").Methods("PUT").HandlerFunc(apiv2.updateJim)
+	r.Path(conf.WebPath + "/api/v2/jim").Methods("DELETE").HandlerFunc(apiv2.deleteJim)
+	r.Path(conf.WebPath + "/api/v2/jim").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
 
-	r.Path("/api/v2/outgoing-smtp").Methods("GET").HandlerFunc(apiv2.listOutgoingSMTP)
-	r.Path("/api/v2/outgoing-smtp").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
+	r.Path(conf.WebPath + "/api/v2/outgoing-smtp").Methods("GET").HandlerFunc(apiv2.listOutgoingSMTP)
+	r.Path(conf.WebPath + "/api/v2/outgoing-smtp").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
 
 	return apiv2
 }
