@@ -21,7 +21,7 @@ type APIv2 struct {
 }
 
 func CreateAPIv2(conf *config.Config, r *pat.Router) *APIv2 {
-	log.Println("Creating API v2  with WebPath: " + conf.WebPath)
+	log.Println("Creating API v2 with WebPath: " + conf.WebPath)
 	apiv2 := &APIv2{
 		config: conf,
 	}
