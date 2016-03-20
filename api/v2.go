@@ -88,7 +88,10 @@ func (apiv2 *APIv2) messages(w http.ResponseWriter, req *http.Request) {
 
 	var res messagesResult
 
-	messages, _ := apiv2.config.Storage.List(start, limit)
+	messages, err := apiv2.config.Storage.List(start, limit)
+	if err != nil {
+		panic(err)
+	}
 
 	res.Count = len([]data.Message(*messages))
 	res.Start = start

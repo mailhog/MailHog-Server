@@ -239,15 +239,15 @@ func (apiv1 *APIv1) delete_all(w http.ResponseWriter, req *http.Request) {
 	apiv1.defaultOptions(w, req)
 
 	w.Header().Add("Content-Type", "text/json")
-	switch apiv1.config.Storage.(type) {
-	case *storage.MongoDB:
-		apiv1.config.Storage.(*storage.MongoDB).DeleteAll()
-	case *storage.InMemory:
-		apiv1.config.Storage.(*storage.InMemory).DeleteAll()
-	default:
+
+	err := apiv1.config.Storage.DeleteAll()
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(500)
 		return
 	}
+
+	w.WriteHeader(200)
 }
 
 func (apiv1 *APIv1) release_one(w http.ResponseWriter, req *http.Request) {
@@ -346,12 +346,11 @@ func (apiv1 *APIv1) delete_one(w http.ResponseWriter, req *http.Request) {
 	apiv1.defaultOptions(w, req)
 
 	w.Header().Add("Content-Type", "text/json")
-	switch apiv1.config.Storage.(type) {
-	case *storage.MongoDB:
-		apiv1.config.Storage.(*storage.MongoDB).DeleteOne(id)
-	case *storage.InMemory:
-		apiv1.config.Storage.(*storage.InMemory).DeleteOne(id)
-	default:
+	err := apiv1.config.Storage.DeleteOne(id)
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(500)
+		return
 	}
+	w.WriteHeader(200)
 }
