@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
 	"github.com/mailhog/MailHog-Server/config"
+	"github.com/mailhog/data"
 	"github.com/mailhog/storage"
 
 	"github.com/ian-kent/goose"
@@ -24,7 +25,8 @@ import (
 //
 // Any changes/additions should be added in APIv2.
 type APIv1 struct {
-	config *config.Config
+	config      *config.Config
+	messageChan chan *data.Message
 }
 
 // FIXME should probably move this into APIv1 struct
@@ -33,10 +35,11 @@ var stream *goose.EventStream
 // ReleaseConfig is an alias to preserve go package API
 type ReleaseConfig config.OutgoingSMTP
 
-func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
+func createAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
 	log.Println("Creating API v1 with WebPath: " + conf.WebPath)
 	apiv1 := &APIv1{
-		config: conf,
+		config:      conf,
+		messageChan: make(chan *data.Message),
 	}
 
 	stream = goose.NewEventStream()
@@ -65,7 +68,7 @@ func CreateAPIv1(conf *config.Config, r *pat.Router) *APIv1 {
 		keepaliveTicker := time.Tick(time.Minute)
 		for {
 			select {
-			case msg := <-apiv1.config.MessageChan:
+			case msg := <-apiv1.messageChan:
 				log.Println("Got message in APIv1 event stream")
 				bytes, _ := json.MarshalIndent(msg, "", "  ")
 				json := string(bytes)

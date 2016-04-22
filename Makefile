@@ -21,6 +21,7 @@ deps:
 	go get github.com/ian-kent/goose
 	go get github.com/ian-kent/linkio
 	go get github.com/jteeuwen/go-bindata/...
+	go get github.com/gorilla/websocket
 	go get labix.org/v2/mgo
 
 test-deps:
