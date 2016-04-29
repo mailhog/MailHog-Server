@@ -13,8 +13,8 @@ const (
 	pongWait = 60 * time.Second
 	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
-	// Maximum message size allowed from peer.
-	maxMessageSize = 256
+	// Maximum message size allowed from peer. Set to minimum allowed value as we don't expect the client to send non-control messages.
+	maxMessageSize = 1
 )
 
 type connection struct {
@@ -28,7 +28,7 @@ func (c *connection) readLoop() {
 		c.hub.unregisterChan <- c
 		c.ws.Close()
 	}()
-	c.ws.SetReadLimit(256)
+	c.ws.SetReadLimit(maxMessageSize)
 	c.ws.SetReadDeadline(time.Now().Add(pongWait))
 	c.ws.SetPongHandler(func(string) error { c.ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
