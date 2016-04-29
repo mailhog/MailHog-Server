@@ -20,6 +20,9 @@ func NewHub() *Hub {
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  256,
 			WriteBufferSize: 4096,
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
 		},
 		connections:    make(map[*connection]bool),
 		messages:       make(chan interface{}),
