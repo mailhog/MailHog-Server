@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/smtp"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -204,7 +205,8 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 	// TODO extension from content-type?
 	apiv1.defaultOptions(w, req)
 
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+id+"-part-"+part+"\"")
+	filename := `"` + id + "-part-" + part + `"`
+	contentDisposition := "attachment"
 
 	message, _ := apiv1.config.Storage.Load(id)
 	contentTransferEncoding := ""
@@ -212,9 +214,13 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 	for h, l := range message.MIME.Parts[pid].Headers {
 		for _, v := range l {
 			switch strings.ToLower(h) {
+			case "content-type":
+				re := regexp.MustCompile(`name=([^\s;"]+|"[^"]+")`)
+				if matches := re.FindStringSubmatch(v); matches != nil {
+					filename = matches[1]
+				}
 			case "content-disposition":
-				// Prevent duplicate "content-disposition"
-				w.Header().Set(h, v)
+				contentDisposition = v
 			case "content-transfer-encoding":
 				if contentTransferEncoding == "" {
 					contentTransferEncoding = v
@@ -225,6 +231,12 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 	}
+
+	if !strings.Contains(contentDisposition, "filename") {
+		contentDisposition += "; filename=" + filename
+	}
+	w.Header().Set("Content-Disposition", contentDisposition)
+
 	body := []byte(message.MIME.Parts[pid].Body)
 	if strings.ToLower(contentTransferEncoding) == "base64" {
 		var e error
