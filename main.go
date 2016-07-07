@@ -6,7 +6,6 @@ import (
 
 	gohttp "net/http"
 
-	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
 	"github.com/mailhog/MailHog-Server/api"
 	"github.com/mailhog/MailHog-Server/config"
@@ -37,8 +36,7 @@ func main() {
 
 	exitCh = make(chan int)
 	cb := func(r gohttp.Handler) {
-		api.CreateAPIv1(conf, r.(*pat.Router))
-		api.CreateAPIv2(conf, r.(*pat.Router))
+		api.CreateAPI(conf, r)
 	}
 	go http.Listen(conf.APIBindAddr, assets.Asset, exitCh, cb)
 	go smtp.Listen(conf, exitCh)
