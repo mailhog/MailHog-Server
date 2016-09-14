@@ -32,23 +32,24 @@ func DefaultConfig() *Config {
 
 // Config is the config, kind of
 type Config struct {
-	SMTPBindAddr     string
-	APIBindAddr      string
-	Hostname         string
-	MongoURI         string
-	MongoDb          string
-	MongoColl        string
-	StorageType      string
-	CORSOrigin       string
-	MaildirPath      string
-	InviteJim        bool
-	Storage          storage.Storage
-	MessageChan      chan *data.Message
-	Assets           func(asset string) ([]byte, error)
-	Monkey           monkey.ChaosMonkey
-	OutgoingSMTPFile string
-	OutgoingSMTP     map[string]*OutgoingSMTP
-	WebPath          string
+	SMTPBindAddr       string
+	APIBindAddr        string
+	Hostname           string
+	MongoURI           string
+	MongoDb            string
+	MongoColl          string
+	StorageType        string
+	CORSOrigin         string
+	MaildirPath        string
+	InviteJim          bool
+	Storage            storage.Storage
+	MessageChan        chan *data.Message
+	Assets             func(asset string) ([]byte, error)
+	Monkey             monkey.ChaosMonkey
+	OutgoingSMTPFile   string
+	OutgoingSMTP       map[string]*OutgoingSMTP
+	WebPath            string
+	MemoryMessageLimit int
 }
 
 // OutgoingSMTP is an outgoing SMTP server config
@@ -74,6 +75,10 @@ func Configure() *Config {
 	case "memory":
 		log.Println("Using in-memory storage")
 		cfg.Storage = storage.CreateInMemory()
+		if cfg.MemoryMessageLimit > 0 {
+			log.Printf("Limiting in-memory storage to %d messages\n", cfg.MemoryMessageLimit)
+			cfg.Storage.(*storage.InMemory).SetMessageLimit(cfg.MemoryMessageLimit)
+		}
 	case "mongodb":
 		log.Println("Using MongoDB message storage")
 		s := storage.CreateMongoDB(cfg.MongoURI, cfg.MongoDb, cfg.MongoColl)
@@ -128,5 +133,6 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MaildirPath, "maildir-path", envconf.FromEnvP("MH_MAILDIR_PATH", "").(string), "Maildir path (if storage type is 'maildir')")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
 	flag.StringVar(&cfg.OutgoingSMTPFile, "outgoing-smtp", envconf.FromEnvP("MH_OUTGOING_SMTP", "").(string), "JSON file containing outgoing SMTP servers")
+	flag.IntVar(&cfg.MemoryMessageLimit, "storage-message-limit", envconf.FromEnvP("MH_STORAGE_MESSAGE_LIMIT", 0).(int), "Storage message limit (memory storage only, default no limit)")
 	Jim.RegisterFlags()
 }
