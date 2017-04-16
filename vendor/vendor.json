@@ -117,10 +117,10 @@
 			"revisionTime": "2016-11-19T23:01:07Z"
 		},
 		{
-			"checksumSHA1": "VFMqtv5B8sXJR50Rwn21jjJZw3E=",
+			"checksumSHA1": "o0iY7SpW0phHTRA/xW3O2CyNLF8=",
 			"path": "github.com/mailhog/storage",
-			"revision": "426662792547f066565458d62f52cb05fabc5535",
-			"revisionTime": "2016-11-15T21:39:50Z"
+			"revision": "295f257171af29ea8ee6411a9a0ee3cc04338482",
+			"revisionTime": "2017-04-16T22:26:00Z"
 		},
 		{
 			"checksumSHA1": "mbhJnsNwGAwkTQH5c2hVRO9YmxA=",

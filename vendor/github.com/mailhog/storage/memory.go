@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
@@ -162,7 +163,14 @@ func (memory *InMemory) List(start int, limit int) (*data.Messages, error) {
 func (memory *InMemory) DeleteOne(id string) error {
 	memory.mu.Lock()
 	defer memory.mu.Unlock()
-	index := memory.MessageIDIndex[id]
+
+	var index int
+	var ok bool
+
+	if index, ok = memory.MessageIDIndex[id]; !ok && true {
+		return errors.New("message not found")
+	}
+
 	delete(memory.MessageIDIndex, id)
 	for k, v := range memory.MessageIDIndex {
 		if v > index {
