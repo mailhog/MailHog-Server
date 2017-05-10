@@ -136,6 +136,11 @@ func (apiv1 *APIv1) messages(w http.ResponseWriter, req *http.Request) {
 		bytes, _ := json.Marshal(messages)
 		w.Header().Add("Content-Type", "text/json")
 		w.Write(bytes)
+	case *storage.Maildir:
+		messages, _ := apiv1.config.Storage.(*storage.Maildir).List(0, 1000)
+		bytes, _ := json.Marshal(messages)
+		w.Header().Add("Content-Type", "text/json")
+		w.Write(bytes)
 	default:
 		w.WriteHeader(500)
 	}
