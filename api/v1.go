@@ -215,7 +215,7 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 		for _, v := range l {
 			switch strings.ToLower(h) {
 			case "content-type":
-				re := regexp.MustCompile(`name=([^\s;"]+|"[^"]+")`)
+				re := regexp.MustCompile(`name=([^\s;"]+|"(?:[^"\\]|\\.)*")`)
 				if matches := re.FindStringSubmatch(v); matches != nil {
 					filename = matches[1]
 				}
