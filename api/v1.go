@@ -219,6 +219,7 @@ func (apiv1 *APIv1) download_part(w http.ResponseWriter, req *http.Request) {
 				if matches := re.FindStringSubmatch(v); matches != nil {
 					filename = matches[1]
 				}
+				w.Header().Add(h, v)
 			case "content-disposition":
 				contentDisposition = v
 			case "content-transfer-encoding":
