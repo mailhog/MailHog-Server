@@ -1,4 +1,9 @@
 language: go
+sudo: false
+before_script:
+  - go get ./...
 go:
  - 1.6
+ - 1.7.x
+ - 1.8.x
  - tip
