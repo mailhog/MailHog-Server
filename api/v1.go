@@ -103,7 +103,6 @@ func (apiv1 *APIv1) broadcast(json string) {
 // connections. Without this it is possible for the server to become
 // unresponsive due to too many open files.
 func (apiv1 *APIv1) keepalive() {
-	log.Println("[APIv1] KEEPALIVE /api/v1/events")
 	stream.Notify("keepalive", []byte{})
 }
 
