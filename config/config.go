@@ -6,6 +6,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/ian-kent/envconf"
 	"github.com/mailhog/MailHog-Server/monkey"
@@ -50,6 +51,7 @@ type Config struct {
 	OutgoingSMTPFile string
 	OutgoingSMTP     map[string]*OutgoingSMTP
 	WebPath          string
+	CertsPaths       string
 	TLSConfig        *tls.Config
 }
 
@@ -114,6 +116,32 @@ func Configure() *Config {
 		cfg.OutgoingSMTP = o
 	}
 
+	if cfg.CertsPaths != "" {
+		pairCandidates := strings.Split(cfg.CertsPaths, ";")
+
+		if len(pairCandidates) > 0 {
+			certificates := make([]tls.Certificate, len(pairCandidates))
+			for i, pairCandidate := range pairCandidates {
+				pair := strings.Split(pairCandidate, ",")
+
+				if len(pair) != 2 {
+					log.Fatalf("Certificate path pair %d must be in form certPath,keyPath", i)
+				}
+
+				cert, err := tls.LoadX509KeyPair(pair[0], pair[1])
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				certificates[i] = cert
+			}
+
+			cfg.TLSConfig = &tls.Config{
+				Certificates: certificates,
+			}
+		}
+	}
+
 	return cfg
 }
 
@@ -130,5 +158,6 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MaildirPath, "maildir-path", envconf.FromEnvP("MH_MAILDIR_PATH", "").(string), "Maildir path (if storage type is 'maildir')")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
 	flag.StringVar(&cfg.OutgoingSMTPFile, "outgoing-smtp", envconf.FromEnvP("MH_OUTGOING_SMTP", "").(string), "JSON file containing outgoing SMTP servers")
+	flag.StringVar(&cfg.CertsPaths, "certs-paths", envconf.FromEnvP("MH_CERTS_PATHS", "").(string), "A comma separated list of tls certificates, in schema cert1Path,key1Path;cert1Path,key2Path ... etc")
 	Jim.RegisterFlags()
 }
