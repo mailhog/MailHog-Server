@@ -31,7 +31,7 @@ type Session struct {
 }
 
 // Accept starts a new SMTP session using io.ReadWriteCloser
-func Accept(remoteAddress string, conn io.ReadWriteCloser, storage storage.Storage, messageChan chan *data.Message, hostname string, monkey monkey.ChaosMonkey) {
+func Accept(remoteAddress string, conn io.ReadWriteCloser, tlsUpgrader func() io.ReadWriteCloser, storage storage.Storage, messageChan chan *data.Message, hostname string, monkey monkey.ChaosMonkey) {
 	defer conn.Close()
 
 	proto := smtp.NewProtocol()
@@ -55,6 +55,26 @@ func Accept(remoteAddress string, conn io.ReadWriteCloser, storage storage.Stora
 	proto.ValidateRecipientHandler = session.validateRecipient
 	proto.ValidateAuthenticationHandler = session.validateAuthentication
 	proto.GetAuthenticationMechanismsHandler = func() []string { return []string{"PLAIN"} }
+
+	if tlsUpgrader != nil {
+		proto.TLSHandler = func(done func(ok bool)) (errorReply *smtp.Reply, callback func(), ok bool) {
+			done(true)
+			return nil, func() {
+				newCon := tlsUpgrader()
+
+				session.reader = io.Reader(newCon)
+				session.writer = io.Writer(newCon)
+				if monkey != nil {
+					linkSpeed := monkey.LinkSpeed()
+					if linkSpeed != nil {
+						link = linkio.NewLink(*linkSpeed * linkio.BytePerSecond)
+						session.reader = link.NewLinkReader(io.Reader(newCon))
+						session.writer = link.NewLinkWriter(io.Writer(newCon))
+					}
+				}
+			}, true
+		}
+	}
 
 	session.logf("Starting session")
 	session.Write(proto.Start())
@@ -159,5 +179,9 @@ func (c *Session) Write(reply *smtp.Reply) {
 		logText = strings.Replace(logText, "\r", "\\r", -1)
 		c.logf("Sent %d bytes: '%s'", len(l), logText)
 		c.writer.Write([]byte(l))
+	}
+
+	if reply.Done != nil {
+		reply.Done()
 	}
 }

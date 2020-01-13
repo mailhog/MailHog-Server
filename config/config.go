@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"io/ioutil"
@@ -49,6 +50,7 @@ type Config struct {
 	OutgoingSMTPFile string
 	OutgoingSMTP     map[string]*OutgoingSMTP
 	WebPath          string
+	TLSConfig        *tls.Config
 }
 
 // OutgoingSMTP is an outgoing SMTP server config
