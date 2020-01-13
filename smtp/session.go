@@ -59,7 +59,7 @@ func Accept(remoteAddress string, conn io.ReadWriteCloser, storage storage.Stora
 	session.logf("Starting session")
 	session.Write(proto.Start())
 	for session.Read() == true {
-		if monkey != nil && monkey.Disconnect != nil && monkey.Disconnect() {
+		if monkey != nil && monkey.Disconnect() {
 			session.conn.Close()
 			break
 		}
