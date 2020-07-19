@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"log"
+	"time"
 
 	"github.com/ian-kent/envconf"
 	"github.com/mailhog/MailHog-Server/monkey"
@@ -15,40 +16,46 @@ import (
 // DefaultConfig is the default config
 func DefaultConfig() *Config {
 	return &Config{
-		SMTPBindAddr: "0.0.0.0:1025",
-		APIBindAddr:  "0.0.0.0:8025",
-		Hostname:     "mailhog.example",
-		MongoURI:     "127.0.0.1:27017",
-		MongoDb:      "mailhog",
-		MongoColl:    "messages",
-		MaildirPath:  "",
-		StorageType:  "memory",
-		CORSOrigin:   "",
-		WebPath:      "",
-		MessageChan:  make(chan *data.Message),
-		OutgoingSMTP: make(map[string]*OutgoingSMTP),
+		SMTPBindAddr:       "0.0.0.0:1025",
+		APIBindAddr:        "0.0.0.0:8025",
+		Hostname:           "mailhog.example",
+		MongoURI:           "127.0.0.1:27017",
+		MongoDb:            "mailhog",
+		MongoColl:          "messages",
+		MongoRetries:       3,
+		MongoRetryInterval: 10,
+		InMemoryFallback:   false,
+		MaildirPath:        "",
+		StorageType:        "memory",
+		CORSOrigin:         "",
+		WebPath:            "",
+		MessageChan:        make(chan *data.Message),
+		OutgoingSMTP:       make(map[string]*OutgoingSMTP),
 	}
 }
 
 // Config is the config, kind of
 type Config struct {
-	SMTPBindAddr     string
-	APIBindAddr      string
-	Hostname         string
-	MongoURI         string
-	MongoDb          string
-	MongoColl        string
-	StorageType      string
-	CORSOrigin       string
-	MaildirPath      string
-	InviteJim        bool
-	Storage          storage.Storage
-	MessageChan      chan *data.Message
-	Assets           func(asset string) ([]byte, error)
-	Monkey           monkey.ChaosMonkey
-	OutgoingSMTPFile string
-	OutgoingSMTP     map[string]*OutgoingSMTP
-	WebPath          string
+	SMTPBindAddr       string
+	APIBindAddr        string
+	Hostname           string
+	MongoURI           string
+	MongoDb            string
+	MongoColl          string
+	MongoRetries       int
+	MongoRetryInterval int
+	InMemoryFallback   bool
+	StorageType        string
+	CORSOrigin         string
+	MaildirPath        string
+	InviteJim          bool
+	Storage            storage.Storage
+	MessageChan        chan *data.Message
+	Assets             func(asset string) ([]byte, error)
+	Monkey             monkey.ChaosMonkey
+	OutgoingSMTPFile   string
+	OutgoingSMTP       map[string]*OutgoingSMTP
+	WebPath            string
 }
 
 // OutgoingSMTP is an outgoing SMTP server config
@@ -76,13 +83,27 @@ func Configure() *Config {
 		cfg.Storage = storage.CreateInMemory()
 	case "mongodb":
 		log.Println("Using MongoDB message storage")
-		s := storage.CreateMongoDB(cfg.MongoURI, cfg.MongoDb, cfg.MongoColl)
-		if s == nil {
-			log.Println("MongoDB storage unavailable, reverting to in-memory storage")
-			cfg.Storage = storage.CreateInMemory()
-		} else {
-			log.Println("Connected to MongoDB")
-			cfg.Storage = s
+		for retryCount := 1; retryCount <= cfg.MongoRetries; retryCount++ {
+			s := storage.CreateMongoDB(cfg.MongoURI, cfg.MongoDb, cfg.MongoColl)
+			if s == nil {
+				if retryCount < cfg.MongoRetries {
+					log.Printf("Error connecting to MongoDB: retrying in %d seconds...", cfg.MongoRetryInterval)
+					time.Sleep(time.Duration(cfg.MongoRetryInterval) * time.Second)
+					continue
+				} else {
+					if cfg.InMemoryFallback {
+						log.Printf("MongoDB storage unavailable after %d attempts, reverting to in-memory storage", cfg.MongoRetries)
+						cfg.Storage = storage.CreateInMemory()
+						break
+					} else {
+						log.Fatalf("MongoDB storage unavailable after %d attempts. Exiting.", cfg.MongoRetries)
+					}
+				}
+			} else {
+				log.Println("Connected to MongoDB")
+				cfg.Storage = s
+				break
+			}
 		}
 	case "maildir":
 		log.Println("Using maildir message storage")
@@ -124,6 +145,9 @@ func RegisterFlags() {
 	flag.StringVar(&cfg.MongoURI, "mongo-uri", envconf.FromEnvP("MH_MONGO_URI", "127.0.0.1:27017").(string), "MongoDB URI, e.g. 127.0.0.1:27017")
 	flag.StringVar(&cfg.MongoDb, "mongo-db", envconf.FromEnvP("MH_MONGO_DB", "mailhog").(string), "MongoDB database, e.g. mailhog")
 	flag.StringVar(&cfg.MongoColl, "mongo-coll", envconf.FromEnvP("MH_MONGO_COLLECTION", "messages").(string), "MongoDB collection, e.g. messages")
+	flag.IntVar(&cfg.MongoRetries, "mongo-retries", envconf.FromEnvP("MH_MONGO_RETRIES", 3).(int), "Number of attempts to connect to MongoDB")
+	flag.IntVar(&cfg.MongoRetryInterval, "mongo-retry-interval", envconf.FromEnvP("MH_MONGO_RETRY_INTERVAL", 10).(int), "Interval between connection attempts to MongoDB (in seconds)")
+	flag.BoolVar(&cfg.InMemoryFallback, "mongo-in-memory-fallback", envconf.FromEnvP("MH_MONGO_IN_MEMORY_FALLBACK", false).(bool), "Use in-memory storage if connection to MongoDB fails (true) or exit (false)")
 	flag.StringVar(&cfg.CORSOrigin, "cors-origin", envconf.FromEnvP("MH_CORS_ORIGIN", "").(string), "CORS Access-Control-Allow-Origin header for API endpoints")
 	flag.StringVar(&cfg.MaildirPath, "maildir-path", envconf.FromEnvP("MH_MAILDIR_PATH", "").(string), "Maildir path (if storage type is 'maildir')")
 	flag.BoolVar(&cfg.InviteJim, "invite-jim", envconf.FromEnvP("MH_INVITE_JIM", false).(bool), "Decide whether to invite Jim (beware, he causes trouble)")
