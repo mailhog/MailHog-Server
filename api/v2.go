@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gorilla/pat"
 	"github.com/ian-kent/go-log/log"
@@ -48,6 +50,10 @@ func createAPIv2(conf *config.Config, r *pat.Router) *APIv2 {
 
 	r.Path(conf.WebPath + "/api/v2/websocket").Methods("GET").HandlerFunc(apiv2.websocket)
 
+        r.Path(conf.WebPath + "/api/v2/list").Methods("GET").HandlerFunc(apiv2.list)
+        r.Path(conf.WebPath + "/api/v2/list").Methods("OPTIONS").HandlerFunc(apiv2.defaultOptions)
+
+
 	go func() {
 		for {
 			select {
@@ -75,6 +81,17 @@ type messagesResult struct {
 	Start int            `json:"start"`
 	Items []data.Message `json:"items"`
 }
+
+
+type messagesResultList struct {
+        ID string            `json:"id"`
+        FROM string          `json:"from"`
+        TO string            `json:"to"`
+        DATE string          `json:"date"`
+        SUBJECT string       `json:"subject"`
+}
+
+
 
 func (apiv2 *APIv2) getStartLimit(w http.ResponseWriter, req *http.Request) (start, limit int) {
 	start = 0
@@ -118,6 +135,58 @@ func (apiv2 *APIv2) messages(w http.ResponseWriter, req *http.Request) {
 	bytes, _ := json.Marshal(res)
 	w.Header().Add("Content-Type", "text/json")
 	w.Write(bytes)
+}
+
+func (apiv2 *APIv2) list(w http.ResponseWriter, req *http.Request) {
+        log.Println("[APIv2] GET /api/v2/list")
+
+        apiv2.defaultOptions(w, req)
+
+        start, limit := apiv2.getStartLimit(w, req)
+
+        var res []messagesResultList
+
+        messages, err := apiv2.config.Storage.List(start, limit)
+        if err != nil {
+                panic(err)
+        }
+
+     	for _,mess := range *messages {
+		var resItem messagesResultList
+		var from *data.Path
+		var to []*data.Path
+		var contents map[string][]string
+
+		from =  mess.From
+                to = mess.To
+		contents = mess.Content.Headers
+
+		resItem.ID = string(mess.ID)
+		resItem.FROM = strings.ToLower(from.Mailbox+"@"+from.Domain)
+
+		var to_string string
+                for _,to_rcpt := range to {
+			if to_string != "" { to_string += "," }
+                	to_string += strings.ToLower(to_rcpt.Mailbox+"@"+to_rcpt.Domain)
+		}
+		resItem.TO = to_string
+		resItem.DATE =  mess.Created.Format(time.RFC3339)
+
+		var subject string
+		for k,Header := range contents {
+			if(strings.HasPrefix(k,"Subject")){
+				subject +=  strings.Join(Header, " ")
+			}
+		}
+
+		resItem.SUBJECT = subject
+		res = append(res, resItem)
+	}
+        bytes, err := json.Marshal(res)
+	if( string(bytes) == "null"){ bytes = []byte("[{No emails}]") }
+
+        w.Header().Add("Content-Type", "text/json")
+        w.Write(bytes)
 }
 
 func (apiv2 *APIv2) search(w http.ResponseWriter, req *http.Request) {
