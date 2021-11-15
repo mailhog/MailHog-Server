@@ -1,6 +1,7 @@
 package smtp
 
 import (
+	"crypto/tls"
 	"io"
 	"log"
 	"net"
@@ -31,9 +32,17 @@ func Listen(cfg *config.Config, exitCh chan int) *net.TCPListener {
 			}
 		}
 
+		var tlsUpgrader func() io.ReadWriteCloser
+		if cfg.TLSConfig != nil {
+			tlsUpgrader = func() io.ReadWriteCloser {
+				return io.ReadWriteCloser(tls.Server(conn, cfg.TLSConfig))
+			}
+		}
+
 		go Accept(
 			conn.(*net.TCPConn).RemoteAddr().String(),
 			io.ReadWriteCloser(conn),
+			tlsUpgrader,
 			cfg.Storage,
 			cfg.MessageChan,
 			cfg.Hostname,

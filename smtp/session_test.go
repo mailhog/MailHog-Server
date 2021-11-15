@@ -2,6 +2,7 @@ package smtp
 
 import (
 	"errors"
+	"io"
 	"sync"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestAccept(t *testing.T) {
 	Convey("Accept should handle a connection", t, func() {
 		frw := &fakeRw{}
 		mChan := make(chan *data.Message)
-		Accept("1.1.1.1:11111", frw, storage.CreateInMemory(), mChan, "localhost", nil)
+		Accept("1.1.1.1:11111", frw, nil, storage.CreateInMemory(), mChan, "localhost", nil)
 	})
 }
 
@@ -52,56 +53,132 @@ func TestSocketError(t *testing.T) {
 			},
 		}
 		mChan := make(chan *data.Message)
-		Accept("1.1.1.1:11111", frw, storage.CreateInMemory(), mChan, "localhost", nil)
+		Accept("1.1.1.1:11111", frw, nil, storage.CreateInMemory(), mChan, "localhost", nil)
 	})
 }
 
 func TestAcceptMessage(t *testing.T) {
 	Convey("acceptMessage should be called", t, func() {
-		mbuf := "EHLO localhost\nMAIL FROM:<test>\nRCPT TO:<test>\nDATA\nHi.\r\n.\r\nQUIT\n"
-		var rbuf []byte
-		frw := &fakeRw{
-			_read: func(p []byte) (n int, err error) {
-				if len(p) >= len(mbuf) {
-					ba := []byte(mbuf)
-					mbuf = ""
-					for i, b := range ba {
-						p[i] = b
-					}
-					return len(ba), nil
-				}
+		mbuf := "EHLO localhost\r\n" +
+			"MAIL FROM:<test>\r\n" +
+			"RCPT TO:<test>\r\n" +
+			"DATA\r\n" +
+			"Hi.\r\n" +
+			".\r\n" +
+			"QUIT\n"
 
-				ba := []byte(mbuf[0:len(p)])
-				mbuf = mbuf[len(p):]
-				for i, b := range ba {
-					p[i] = b
-				}
-				return len(ba), nil
-			},
-			_write: func(p []byte) (n int, err error) {
-				rbuf = append(rbuf, p...)
-				return len(p), nil
-			},
-			_close: func() error {
-				return nil
-			},
-		}
+		frw, obuf := getBuffer(mbuf)
 		mChan := make(chan *data.Message)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		handlerCalled := false
+		var storedMessage *data.Message
 		go func() {
 			handlerCalled = true
-			<-mChan
-			//FIXME breaks some tests (in drone.io)
-			//m := <-mChan
-			//So(m, ShouldNotBeNil)
+			storedMessage = <-mChan
 			wg.Done()
 		}()
-		Accept("1.1.1.1:11111", frw, storage.CreateInMemory(), mChan, "localhost", nil)
+		Accept("1.1.1.1:11111", frw, nil, storage.CreateInMemory(), mChan, "localhost", nil)
 		wg.Wait()
+
 		So(handlerCalled, ShouldBeTrue)
+
+		So(storedMessage, ShouldNotBeNil)
+		So(string(*obuf), ShouldEqual,
+			"220 localhost ESMTP MailHog\r\n"+
+				"250-Hello localhost\r\n"+
+				"250-PIPELINING\r\n"+
+				"250 AUTH PLAIN\r\n"+
+				"250 Sender test ok\r\n"+
+				"250 Recipient test ok\r\n"+
+				"354 End data with <CR><LF>.<CR><LF>\r\n"+
+				"250 Ok: queued as "+storedMessage.ID+"\r\n",
+		)
 	})
+}
+
+func TestAcceptTLSUpgrade(t *testing.T) {
+	Convey("acceptMessage should be called", t, func() {
+		mbuf1 := "STARTTLS\r\n"
+		mbuf2 := "EHLO localhost\r\n" +
+			"MAIL FROM:<test>\r\n" +
+			"RCPT TO:<test>\r\n" +
+			"DATA\r\n" +
+			"Hi.\r\n" +
+			".\r\n" +
+			"QUIT\n"
+
+		frw1, obuf1 := getBuffer(mbuf1)
+		frw2, obuf2 := getBuffer(mbuf2)
+		mChan := make(chan *data.Message)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		handlerCalled := false
+		var storedMessage *data.Message
+		go func() {
+			handlerCalled = true
+			storedMessage = <-mChan
+			wg.Done()
+		}()
+
+		tlsWasUpgraded := false
+		tlsUpgrade := func() io.ReadWriteCloser {
+			tlsWasUpgraded = true
+			return frw2
+		}
+
+		Accept("1.1.1.1:11111", frw1, tlsUpgrade, storage.CreateInMemory(), mChan, "localhost", nil)
+		wg.Wait()
+
+		So(handlerCalled, ShouldBeTrue)
+		So(tlsWasUpgraded, ShouldBeTrue)
+
+		So(storedMessage, ShouldNotBeNil)
+		So(string(*obuf1), ShouldEqual,
+			"220 localhost ESMTP MailHog\r\n"+
+				"220 Ready to start TLS\r\n",
+		)
+		So(string(*obuf2), ShouldEqual,
+			"250-Hello localhost\r\n"+
+				"250-PIPELINING\r\n"+
+				"250 AUTH PLAIN\r\n"+
+				"250 Sender test ok\r\n"+
+				"250 Recipient test ok\r\n"+
+				"354 End data with <CR><LF>.<CR><LF>\r\n"+
+				"250 Ok: queued as "+storedMessage.ID+"\r\n",
+		)
+	})
+}
+
+func getBuffer(input string) (io.ReadWriteCloser, *[]byte) {
+	var rbuf []byte
+	frw := &fakeRw{
+		_read: func(p []byte) (n int, err error) {
+			if len(p) >= len(input) {
+				ba := []byte(input)
+				input = ""
+				for i, b := range ba {
+					p[i] = b
+				}
+				return len(ba), nil
+			}
+
+			ba := []byte(input[0:len(p)])
+			input = input[len(p):]
+			for i, b := range ba {
+				p[i] = b
+			}
+			return len(ba), nil
+		},
+		_write: func(p []byte) (n int, err error) {
+			rbuf = append(rbuf, p...)
+			return len(p), nil
+		},
+		_close: func() error {
+			return nil
+		},
+	}
+	return frw, &rbuf
 }
 
 func TestValidateAuthentication(t *testing.T) {
